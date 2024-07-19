@@ -16,6 +16,11 @@
 #   - NASM (Netwide Assembler)
 #   - Visual Studio 2022
 
+"""
+[ ] Sprawdz czy zwykly shellcode dziala
+[ ] Moze NASM trzeba jakos inaczej kompilowac / pobierac?
+"""
+
 import subprocess
 import os
 import sys
@@ -65,7 +70,7 @@ if __name__ == "__main__":
 
     # Compile Assembly
     subprocess.run(
-        ["nasm", "-f", "win64", SHELLCODE_INPUT_FILE, "-o", SHELLCODE_OUTPUT_FILE], check=True
+        ["nasm", "-f", "bin", SHELLCODE_INPUT_FILE, "-o", SHELLCODE_OUTPUT_FILE], check=True
     )
 
     print(f"[+] NASM: {SHELLCODE_INPUT_FILE} -> {SHELLCODE_OUTPUT_FILE}")

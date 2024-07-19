@@ -1,7 +1,5 @@
-; Compile & get shellcode from Kali:
-;   nasm -f win64 popcalc.asm -o popcalc.o
-;   for i in $(objdump -D popcalc.o | grep "^ " | cut -f2); do echo -n "\x$i" ; done
-; Get kernel32.dll base address
+[bits 64]
+
 xor rdi, rdi            ; RDI = 0x0
 mul rdi                 ; RAX&RDX =0x0
 mov rbx, gs:[rax+0x60]  ; RBX = Address_of_PEB
