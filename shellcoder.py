@@ -16,11 +16,6 @@
 #   - NASM (Netwide Assembler)
 #   - Visual Studio 2022
 
-"""
-[ ] Sprawdz czy zwykly shellcode dziala
-[ ] Moze NASM trzeba jakos inaczej kompilowac / pobierac?
-"""
-
 import subprocess
 import os
 import sys
@@ -30,7 +25,7 @@ OUT_DIR = "out"
 
 # Utility files
 SHELLCODE_INPUT_FILE = "shellcode.asm"
-SHELLCODE_OUTPUT_FILE = f"{OUT_DIR}\\shellcode.bin"
+SHELLCODE_OUTPUT_NAME = f"{OUT_DIR}\\shellcode"
 LOADER_INPUT_FILE = "loader.c"
 LOADER_OUTPUT_FILE = f"{OUT_DIR}\\malware.c"
 
@@ -43,10 +38,30 @@ BINARY_OUTPUT_FILE = f"{OUT_DIR}\\malware.exe"
 # Batch script with Visual Studio compiler environment variables
 MSVC_BATCH_SCRIPT = "C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
 
+global ENVIRON 
+
+
+def get_msvc_console_environs() -> dict[str, str]:
+    cmd = f'"{MSVC_BATCH_SCRIPT}" && set'
+    executable = "C:\\Windows\\System32\\cmd.exe"
+    process = subprocess.run(cmd, text=True, check=True, capture_output=True, shell=True, executable=executable)
+
+    if process.returncode != 0:
+        print(f"[!] MSVC Developer Console error: {process.stderr}")
+        sys.exit(-1)
+
+    envs = {}
+    for line in process.stdout.splitlines():
+        if '=' in line:
+            key, value = line.split('=', 1)
+            envs[key] = value
+            
+    return envs
+  
 
 def is_cmd_available(cmd: str):
     try:
-        subprocess.call(cmd, text=True)
+        subprocess.call(cmd, text=True, stderr=subprocess.PIPE)
     except FileNotFoundError:
         return False
     
@@ -57,27 +72,35 @@ def assert_cmd(cmd: str):
     if (is_cmd_available(cmd)):
         return 
 
-    print(f"[!] command not found: {cmd}", file=sys.stderr)    
+    print(f"[!] Command not found: {cmd}", file=sys.stderr)    
     sys.exit(-1)
 
+def cmd_exec(cmd: str):
+    subprocess.run(cmd, text=True, check=True, shell=True, env=ENVIRON)
 
 if __name__ == "__main__":
     # Check if NASM is available
     assert_cmd("nasm")
+    print("[*] Fetching VS Developer Console envs...")
+    ENVIRON = get_msvc_console_environs()
 
     # Prepare output directory
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    # Compile Assembly
-    subprocess.run(
-        ["nasm", "-f", "bin", SHELLCODE_INPUT_FILE, "-o", SHELLCODE_OUTPUT_FILE], check=True
-    )
+    # Compile Assembly (exe)
+    SHELLCODE_OBJ_OUTPUT = f"{SHELLCODE_OUTPUT_NAME}.obj"
+    cmd_exec(f"nasm -f win64 {SHELLCODE_INPUT_FILE} -o {SHELLCODE_OBJ_OUTPUT}")
+    print(f"[+] NASM: {SHELLCODE_INPUT_FILE} -> {SHELLCODE_OUTPUT_NAME}.exe")
+    cmd_exec(f'cd "{OUT_DIR}" && link "..\\{SHELLCODE_OBJ_OUTPUT}" /out:shellcode.exe /entry:_start /subsystem:console')
 
-    print(f"[+] NASM: {SHELLCODE_INPUT_FILE} -> {SHELLCODE_OUTPUT_FILE}")
+    # Compile Assembly (bin)
+    SHELLCODE_BIN_OUTPUT = f"{SHELLCODE_OUTPUT_NAME}.bin"
+    cmd_exec(f"nasm -f bin {SHELLCODE_INPUT_FILE} -o {SHELLCODE_BIN_OUTPUT}")
+    print(f"[+] NASM: {SHELLCODE_INPUT_FILE} -> {SHELLCODE_BIN_OUTPUT}")
 
     # Prepare C array with shellcode payload
     payload = ""
-    with open(SHELLCODE_OUTPUT_FILE, "rb") as f:
+    with open(SHELLCODE_BIN_OUTPUT, "rb") as f:
         bytes = bytearray(f.read())
 
     size = len(bytes)
@@ -100,8 +123,5 @@ if __name__ == "__main__":
 
     # Compile final binary
     print(f"[*] MSVC: Compilation of {LOADER_OUTPUT_FILE} \n")
-
-    cmd = f'"{MSVC_BATCH_SCRIPT}" && cd "{OUT_DIR}" && cl.exe "../{LOADER_OUTPUT_FILE}"'
-    proc = subprocess.run(cmd, check=True, text=True)
-
+    cmd_exec(f'cd "{OUT_DIR}" && cl.exe "../{LOADER_OUTPUT_FILE}"')
     print(f"\n[+] Output binary ({BINARY_OUTPUT_FILE}) is ready to be executed!")
