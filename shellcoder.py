@@ -50,7 +50,7 @@ def get_msvc_console_environs() -> dict[str, str]:
         print(f"[!] MSVC Developer Console error: {process.stderr}")
         sys.exit(-1)
 
-    envs = {}
+    envs: dict[str, str] = {}
     for line in process.stdout.splitlines():
         if '=' in line:
             key, value = line.split('=', 1)
