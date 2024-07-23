@@ -1,3 +1,7 @@
+; Author: Print3M (https://print3m.github.io/)
+;
+; This code just runs "calc.exe" without any external dependencies.
+;
 [bits 64]
 
 section .text:
